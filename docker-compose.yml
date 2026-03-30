@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  rss:
+    build: .
+    container_name: openilink-app-rss
+    restart: unless-stopped
+    ports:
+      - "8097:8097"
+    environment:
+      - HUB_URL=${HUB_URL}
+      - BASE_URL=${BASE_URL}
+      - DB_PATH=/data/rss.db
+      - PORT=8097
+    volumes:
+      - rss-data:/data
+
+volumes:
+  rss-data:
