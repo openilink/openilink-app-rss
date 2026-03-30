@@ -51,6 +51,27 @@ docker-compose up -d
 | `GET` | `/manifest.json` | 返回应用清单 |
 | `GET` | `/health` | 健康检查 |
 
+## 使用方式
+
+安装到 Bot 后，支持三种方式调用：
+
+### 自然语言（推荐）
+
+直接用微信跟 Bot 对话，Hub AI 会自动识别意图并调用对应功能：
+
+- "帮我订阅这个博客 https://example.com/feed"
+- "看看我订阅了哪些源"
+
+### 命令调用
+
+也可以使用 `/命令名 参数` 的格式直接调用：
+
+- `/subscribe_feed --url https://example.com/feed`
+
+### AI 自动调用
+
+Hub AI 在多轮对话中会自动判断是否需要调用本 App 的功能，无需手动触发。
+
 ## 安全与隐私
 
 ### 数据存储说明
