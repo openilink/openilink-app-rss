@@ -113,17 +113,12 @@ function createHandlers(deps?: ToolModuleDeps): Map<string, ToolHandler> {
     }
 
     const id = Number(feed_id);
-    const feed = store.getFeed(id);
+    const feed = store.getFeed(id, ctx.installationId, ctx.userId);
     if (!feed) {
-      return `错误：未找到 ID 为 ${id} 的订阅`;
+      return `错误：未找到 ID 为 ${id} 的订阅，或无权操作`;
     }
 
-    // 验证归属
-    if (feed.installation_id !== ctx.installationId || feed.user_id !== ctx.userId) {
-      return "错误：无权操作此订阅";
-    }
-
-    store.deleteFeed(id);
+    store.deleteFeed(id, ctx.installationId, ctx.userId);
     return `已取消订阅: ${feed.title}`;
   });
 

@@ -163,11 +163,18 @@ export class Store {
       VALUES (?, ?, ?, ?)
     `);
     const result = stmt.run(installationId, userId, url, title);
-    return this.getFeed(Number(result.lastInsertRowid))!;
+    return this.getFeedById(Number(result.lastInsertRowid))!;
   }
 
-  /** 获取单条 Feed */
-  getFeed(id: number): Feed | undefined {
+  /** 获取单条 Feed（按 ID + 安装实例 + 用户过滤，防止越权） */
+  getFeed(id: number, installationId: string, userId: string): Feed | undefined {
+    return this.db
+      .prepare("SELECT * FROM feeds WHERE id = ? AND installation_id = ? AND user_id = ?")
+      .get(id, installationId, userId) as Feed | undefined;
+  }
+
+  /** 获取单条 Feed（仅按 ID，内部使用） */
+  getFeedById(id: number): Feed | undefined {
     return this.db
       .prepare("SELECT * FROM feeds WHERE id = ?")
       .get(id) as Feed | undefined;
@@ -187,11 +194,11 @@ export class Store {
       .all() as Feed[];
   }
 
-  /** 删除 Feed 订阅 */
-  deleteFeed(id: number): boolean {
+  /** 删除 Feed 订阅（按 ID + 安装实例 + 用户过滤，防止越权） */
+  deleteFeed(id: number, installationId: string, userId: string): boolean {
     // 同时删除关联的 feed_items
     this.db.prepare("DELETE FROM feed_items WHERE feed_id = ?").run(id);
-    const result = this.db.prepare("DELETE FROM feeds WHERE id = ?").run(id);
+    const result = this.db.prepare("DELETE FROM feeds WHERE id = ? AND installation_id = ? AND user_id = ?").run(id, installationId, userId);
     return result.changes > 0;
   }
 

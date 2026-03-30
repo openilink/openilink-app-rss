@@ -123,7 +123,7 @@ export class FeedChecker {
    * @returns 新增条目数
    */
   async checkOneFeed(feedId: number): Promise<number> {
-    const feed = this.store.getFeed(feedId);
+    const feed = this.store.getFeedById(feedId);
     if (!feed || !feed.enabled) return 0;
 
     // 解析 RSS
@@ -163,7 +163,7 @@ export class FeedChecker {
     const items = this.store.getUnnotifiedItems(feedId);
     if (items.length === 0) return;
 
-    const feed = this.store.getFeed(feedId);
+    const feed = this.store.getFeedById(feedId);
     if (!feed) return;
 
     // 获取安装实例
