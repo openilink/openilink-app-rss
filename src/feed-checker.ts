@@ -18,29 +18,67 @@ import { parseFeed } from "./tools/rss.js";
 /** 检查间隔：5 分钟 */
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
+/** 最大并发检查数 */
+const CONCURRENCY = 5;
+
+/**
+ * 并发控制：将数组分成固定大小的批次，每批并行执行
+ * @param items 待处理数组
+ * @param fn 异步处理函数
+ * @param concurrency 最大并发数
+ * @returns 所有结果数组
+ */
+async function parallelMap<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  concurrency: number,
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.allSettled(batch.map(fn));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 /** Feed 检查器 */
 export class FeedChecker {
   private store: Store;
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  /** 防重入标志：正在检查时跳过下一轮 */
+  private checking = false;
 
   constructor(store: Store) {
     this.store = store;
   }
 
-  /** 启动定时检查 */
+  /** 启动定时检查（防重入：上一轮完成后才调度下一轮） */
   start(): void {
     console.log("[feed-checker] 启动定时检查，间隔 5 分钟");
     // 启动后立即执行一次
-    this.checkAll().catch((err) => console.error("[feed-checker] 首次检查失败:", err));
-    this.timer = setInterval(() => {
-      this.checkAll().catch((err) => console.error("[feed-checker] 定时检查失败:", err));
-    }, CHECK_INTERVAL_MS);
+    this.tick();
+  }
+
+  /** 单次检查 tick，完成后调度下一轮 */
+  private async tick(): Promise<void> {
+    if (this.checking) return;
+    this.checking = true;
+    try {
+      await this.checkAll();
+    } catch (err) {
+      console.error("[feed-checker] 定时检查失败:", err);
+    } finally {
+      this.checking = false;
+    }
+    // 上一轮完成后才设置下一轮定时器，避免重入
+    this.timer = setTimeout(() => this.tick(), CHECK_INTERVAL_MS);
   }
 
   /** 停止定时检查 */
   stop(): void {
     if (this.timer) {
-      clearInterval(this.timer);
+      clearTimeout(this.timer);
       this.timer = null;
       console.log("[feed-checker] 定时检查已停止");
     }
@@ -54,15 +92,24 @@ export class FeedChecker {
     const feeds = this.store.getEnabledFeeds();
     if (feeds.length === 0) return 0;
 
-    console.log(`[feed-checker] 开始检查 ${feeds.length} 个订阅源`);
+    console.log(`[feed-checker] 开始检查 ${feeds.length} 个订阅源（并发上限 ${CONCURRENCY}）`);
     let totalNew = 0;
 
-    for (const feed of feeds) {
-      try {
+    // 并发检查，每批最多 CONCURRENCY 个
+    const results = await parallelMap(
+      feeds,
+      async (feed) => {
         const newCount = await this.checkOneFeed(feed.id);
-        totalNew += newCount;
-      } catch (err) {
-        console.error(`[feed-checker] 检查 feed ${feed.id} (${feed.url}) 失败:`, err);
+        return { feed, newCount };
+      },
+      CONCURRENCY,
+    );
+
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        totalNew += result.value.newCount;
+      } else {
+        console.error("[feed-checker] 检查 feed 失败:", result.reason);
       }
     }
 

@@ -146,6 +146,16 @@ export class Store {
 
   // ─── Feed 操作 ─────────────────────────────────────────
 
+  /** 检查 Feed 是否已存在（同一用户、同一 URL 去重） */
+  feedExists(installationId: string, userId: string, url: string): boolean {
+    const row = this.db
+      .prepare(
+        "SELECT 1 FROM feeds WHERE installation_id = ? AND user_id = ? AND url = ? LIMIT 1",
+      )
+      .get(installationId, userId, url);
+    return row !== undefined;
+  }
+
   /** 添加 Feed 订阅 */
   addFeed(installationId: string, userId: string, url: string, title: string): Feed {
     const stmt = this.db.prepare(`

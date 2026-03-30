@@ -5,9 +5,10 @@
 import type { ToolModule, ToolDefinition, ToolHandler, ToolModuleDeps } from "../hub/types.js";
 import type { Store } from "../store.js";
 import RssParser from "rss-parser";
+import { isAllowedUrl } from "../utils/url-validator.js";
 
-/** RSS 解析器实例 */
-const parser = new RssParser();
+/** RSS 解析器实例（10 秒超时，防止慢响应阻塞） */
+const parser = new RssParser({ timeout: 10_000 });
 
 /** 工具定义 */
 const definitions: ToolDefinition[] = [
@@ -63,10 +64,20 @@ function createHandlers(deps?: ToolModuleDeps): Map<string, ToolHandler> {
       return "错误：请提供 RSS 源 URL（url）";
     }
 
+    // SSRF 防护：校验 URL 安全性
+    if (!isAllowedUrl(String(url))) {
+      return "错误：不允许的 URL，仅支持公网 HTTP/HTTPS 地址";
+    }
+
     try {
       // 验证 RSS 有效性
       const feed = await parseFeed(String(url));
       const title = feed.title || url;
+
+      // 去重检查：同一用户不可重复订阅相同 URL
+      if (store.feedExists(ctx.installationId, ctx.userId, String(url))) {
+        return `已存在相同订阅: ${title}`;
+      }
 
       // 保存订阅
       store.addFeed(ctx.installationId, ctx.userId, String(url), title);

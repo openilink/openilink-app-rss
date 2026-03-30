@@ -55,11 +55,25 @@ describe("rssTools", () => {
       expect(result).toContain("url");
     });
 
-    it("RSS 解析失败返回错误", async () => {
-      // parseFeed 会因为 URL 无效而失败
+    it("SSRF 防护：非法 URL 被拦截", async () => {
       const handlers = rssTools.createHandlers({ store });
       const handler = handlers.get("subscribe_feed")!;
-      const result = await handler(makeCtx({ url: "not-a-valid-url" }));
+      // 无效格式
+      const r1 = await handler(makeCtx({ url: "not-a-valid-url" }));
+      expect(r1).toContain("不允许的 URL");
+      // 私有 IP
+      const r2 = await handler(makeCtx({ url: "http://192.168.1.1/feed" }));
+      expect(r2).toContain("不允许的 URL");
+      // localhost
+      const r3 = await handler(makeCtx({ url: "http://localhost/feed" }));
+      expect(r3).toContain("不允许的 URL");
+    });
+
+    it("RSS 解析失败返回错误", async () => {
+      // 合法公网 URL 但不是有效的 RSS 源
+      const handlers = rssTools.createHandlers({ store });
+      const handler = handlers.get("subscribe_feed")!;
+      const result = await handler(makeCtx({ url: "https://example.com/not-a-feed" }));
       expect(result).toContain("订阅失败");
     });
   });

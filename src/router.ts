@@ -56,10 +56,14 @@ export class Router {
     }
 
     // 构建执行上下文: userId 从 sender.id 取得
+    const userId = eventData.sender?.id ?? "";
+    // userId 为空时无法识别用户身份，直接返回错误
+    if (!userId) return "无法识别用户身份，请重试";
+
     const ctx: ToolContext = {
       installationId: event.installation_id,
       botId: event.bot.id,
-      userId: eventData.sender?.id ?? "",
+      userId,
       traceId: event.trace_id,
       args,
     };
